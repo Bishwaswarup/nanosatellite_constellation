@@ -1,112 +1,190 @@
-"""Streamlit command center for the AI-Optimized Nanosatellite Constellation Manager."""
+"""Phase 4 Streamlit command center for the nanosatellite constellation manager."""
 
 from datetime import datetime, timezone
 from pathlib import Path
 
-import plotly.express as px
+import numpy as np
+import plotly.graph_objects as go
 import streamlit as st
 
-from src.models import StationKeepingConfig
 from src.avoidance import CollisionAvoidanceConfig
+from src.models import StationKeepingConfig
 from src.simulation import simulate_tle_constellation
 
 PROJECT_ROOT = Path(__file__).parent
 DEFAULT_TLE_FILE = PROJECT_ROOT / "data" / "sample_constellation.tle"
+EARTH_RADIUS_KM = 6378.137
 
-st.set_page_config(page_title="Nanosatellite Constellation Manager", layout="wide")
-st.title("Nanosatellite Constellation Manager")
-st.caption("Phase 2 — TLE propagation, virtual orbital decay, and deterministic station-keeping")
+
+def earth_surface() -> go.Surface:
+    """Create a lightweight Earth reference sphere for the inertial 3D view."""
+    azimuth, elevation = np.mgrid[0 : 2 * np.pi : 48j, 0 : np.pi : 24j]
+    return go.Surface(
+        x=EARTH_RADIUS_KM * np.cos(azimuth) * np.sin(elevation),
+        y=EARTH_RADIUS_KM * np.sin(azimuth) * np.sin(elevation),
+        z=EARTH_RADIUS_KM * np.cos(elevation),
+        colorscale=[[0, "#0b3558"], [1, "#1f6f9d"]],
+        showscale=False,
+        opacity=0.82,
+        hoverinfo="skip",
+        name="Earth",
+    )
+
+
+def ground_track_figure(telemetry, snapshot) -> go.Figure:
+    """Show all ground tracks and the selected instant's satellite locations."""
+    figure = go.Figure()
+    for satellite, track in telemetry.groupby("satellite", sort=True):
+        figure.add_trace(
+            go.Scattergeo(
+                lon=track["longitude_deg"], lat=track["latitude_deg"], mode="lines", name=satellite,
+                line={"width": 1.5}, hovertemplate=f"{satellite}<br>Lat %{{lat:.2f}}°<br>Lon %{{lon:.2f}}°<extra></extra>",
+            )
+        )
+    figure.add_trace(
+        go.Scattergeo(
+            lon=snapshot["longitude_deg"], lat=snapshot["latitude_deg"], mode="markers+text",
+            text=snapshot["satellite"], textposition="top center", name="Selected time",
+            marker={"size": 9, "color": "#d00000", "line": {"color": "white", "width": 1}},
+            hovertemplate="%{text}<br>Altitude %{customdata[0]:.1f} km<extra></extra>",
+            customdata=snapshot[["altitude_km"]],
+        )
+    )
+    figure.update_geos(showland=True, landcolor="#e8eef3", showocean=True, oceancolor="#ccecff", projection_type="equirectangular")
+    figure.update_layout(height=570, margin={"l": 0, "r": 0, "t": 20, "b": 0}, legend={"orientation": "h", "y": -0.08})
+    return figure
+
+
+def orbital_web_figure(telemetry, snapshot) -> go.Figure:
+    """Show SGP4 TEME trajectories, Earth, and selected-time satellite markers."""
+    figure = go.Figure(data=[earth_surface()])
+    for satellite, track in telemetry.groupby("satellite", sort=True):
+        figure.add_trace(
+            go.Scatter3d(
+                x=track["teme_x_km"], y=track["teme_y_km"], z=track["teme_z_km"], mode="lines",
+                name=satellite, line={"width": 3}, hoverinfo="skip",
+            )
+        )
+    figure.add_trace(
+        go.Scatter3d(
+            x=snapshot["teme_x_km"], y=snapshot["teme_y_km"], z=snapshot["teme_z_km"], mode="markers+text",
+            name="Selected time", text=snapshot["satellite"], textposition="top center",
+            marker={"size": 5, "color": "#ffcb77"},
+            customdata=snapshot[["altitude_km", "fuel_percent"]],
+            hovertemplate="%{text}<br>Altitude %{customdata[0]:.1f} km<br>Fuel %{customdata[1]:.2f}%<extra></extra>",
+        )
+    )
+    figure.update_layout(
+        height=680, margin={"l": 0, "r": 0, "t": 20, "b": 0},
+        scene={
+            "xaxis": {"title": "TEME X (km)", "showbackground": False},
+            "yaxis": {"title": "TEME Y (km)", "showbackground": False},
+            "zaxis": {"title": "TEME Z (km)", "showbackground": False},
+            "aspectmode": "data", "bgcolor": "#081c2c",
+        },
+    )
+    return figure
+
+
+st.set_page_config(page_title="Nanosatellite Constellation Manager", page_icon="🛰️", layout="wide")
+st.title("🛰️ Nanosatellite Constellation Manager")
+st.caption("Phase 4 command center — SGP4 tracking, station-keeping, conjunction screening, and resource telemetry")
 
 with st.sidebar:
-    st.header("Simulation")
+    st.header("Simulation controls")
     duration_hours = st.slider("Duration (hours)", 1, 24, 24)
     step_seconds = st.select_slider("Timestep (seconds)", options=[60, 120, 300, 600], value=300)
-    st.header("Station-keeping")
+    st.divider()
+    st.subheader("Station-keeping")
     decay_rate = st.slider("Virtual decay (km/day)", 0.1, 2.0, 0.5, 0.1)
     altitude_tolerance = st.slider("Altitude tolerance (km)", 0.05, 1.0, 0.25, 0.05)
     initial_propellant = st.slider("Initial propellant (kg)", 0.1, 10.0, 2.0, 0.1)
-    st.header("Collision avoidance")
+    st.subheader("Collision avoidance")
     keep_out_distance = st.slider("Keep-out distance (km)", 1.0, 2_000.0, 2.0, 1.0)
-    run = st.button("Run propagation", type="primary")
+    run = st.button("Run simulation", type="primary", width="stretch")
 
 if run or "telemetry" not in st.session_state:
-    with st.spinner("Propagating constellation with SGP4…"):
+    with st.spinner("Propagating constellation and screening conjunctions…"):
         st.session_state.telemetry = simulate_tle_constellation(
-            DEFAULT_TLE_FILE,
-            start=datetime.now(timezone.utc),
-            duration_hours=duration_hours,
+            DEFAULT_TLE_FILE, start=datetime.now(timezone.utc), duration_hours=duration_hours,
             step_seconds=step_seconds,
             station_keeping=StationKeepingConfig(
-                decay_rate_km_per_day=decay_rate,
-                altitude_tolerance_km=altitude_tolerance,
+                decay_rate_km_per_day=decay_rate, altitude_tolerance_km=altitude_tolerance,
                 initial_propellant_kg=initial_propellant,
             ),
             collision_avoidance=CollisionAvoidanceConfig(keep_out_distance_km=keep_out_distance),
         )
 
 telemetry = st.session_state.telemetry
-latest = telemetry[telemetry["timestamp"] == telemetry["timestamp"].max()].copy()
+timestamps = list(telemetry["timestamp"].drop_duplicates().sort_values())
+selected_time = st.select_slider("Mission time", options=timestamps, value=timestamps[-1], format_func=lambda value: value.strftime("%Y-%m-%d %H:%M UTC"))
+snapshot = telemetry[telemetry["timestamp"] == selected_time].copy()
+active_alerts = snapshot[snapshot["conjunction_alert"]]
 
-col1, col2, col3, col4, col5 = st.columns(5)
-col1.metric("Satellites", latest["satellite"].nunique())
-col2.metric("Telemetry samples", f"{len(telemetry):,}")
-col3.metric("Mean altitude", f"{latest['altitude_km'].mean():.1f} km")
-col4.metric("Station-keeping burns", int(telemetry["station_keeping_event"].sum()))
-col5.metric("Avoidance commands", int(telemetry["avoidance_event"].sum()))
+with st.sidebar:
+    st.divider()
+    st.subheader("Fleet status at selected time")
+    st.metric("Mean fuel", f"{snapshot['fuel_percent'].mean():.2f}%")
+    st.metric("Active alerts", len(active_alerts))
+    st.dataframe(
+        snapshot[["satellite", "altitude_km", "fuel_percent", "station_keeping_status", "avoidance_status"]],
+        hide_index=True, width="stretch",
+        column_config={"altitude_km": st.column_config.NumberColumn("Altitude (km)", format="%.1f"), "fuel_percent": st.column_config.NumberColumn("Fuel (%)", format="%.2f")},
+    )
 
-st.subheader("Ground tracks")
-ground_track = px.line_geo(
-    telemetry,
-    lat="latitude_deg",
-    lon="longitude_deg",
-    color="satellite",
-    hover_data={"altitude_km": ":.1f", "timestamp": True},
-    projection="equirectangular",
-)
-ground_track.update_geos(showland=True, landcolor="#e8eef3", showocean=True, oceancolor="#d6efff")
-st.plotly_chart(ground_track, use_container_width=True)
+metric_columns = st.columns(5)
+metric_columns[0].metric("Satellites", snapshot["satellite"].nunique())
+metric_columns[1].metric("Mean altitude", f"{snapshot['altitude_km'].mean():.1f} km")
+metric_columns[2].metric("Minimum fuel", f"{snapshot['fuel_percent'].min():.2f}%")
+metric_columns[3].metric("Station-keeping burns", int(telemetry["station_keeping_event"].sum()))
+metric_columns[4].metric("Avoidance commands", int(telemetry["avoidance_event"].sum()))
 
-st.subheader("Latest ECEF constellation position")
-orbital_view = px.scatter_3d(
-    latest,
-    x="ecef_x_km",
-    y="ecef_y_km",
-    z="ecef_z_km",
-    color="satellite",
-    hover_data={"altitude_km": ":.1f", "latitude_deg": ":.2f", "longitude_deg": ":.2f"},
-    labels={"ecef_x_km": "ECEF X (km)", "ecef_y_km": "ECEF Y (km)", "ecef_z_km": "ECEF Z (km)"},
-)
-orbital_view.update_layout(height=600)
-st.plotly_chart(orbital_view, use_container_width=True)
+overview, ground_tracks, orbital_web, telemetry_tab = st.tabs(["Overview", "Ground tracks", "3D orbital web", "Telemetry & alerts"])
 
-st.subheader("Latest telemetry and resources")
-st.dataframe(
-    latest[[
-        "satellite", "timestamp", "altitude_km", "controlled_mean_altitude_km", "fuel_remaining_kg",
-        "fuel_percent", "cumulative_delta_v_m_s", "maneuver_count", "station_keeping_status",
-    ]],
-    use_container_width=True,
-    hide_index=True,
-)
+with overview:
+    left, right = st.columns((3, 2))
+    with left:
+        st.subheader("Fleet altitude at selected time")
+        st.bar_chart(snapshot.set_index("satellite")["altitude_km"], color="#0077b6")
+    with right:
+        st.subheader("Operational status")
+        if active_alerts.empty:
+            st.success("No conjunction alert at the selected mission time.")
+        else:
+            st.error(f"{len(active_alerts)} satellite-side conjunction alert(s) active.")
+            st.dataframe(active_alerts[["satellite", "closest_approach_km", "avoidance_status"]], hide_index=True, width="stretch")
+        recent_actions = snapshot[(snapshot["station_keeping_event"]) | (snapshot["avoidance_event"])]
+        if recent_actions.empty:
+            st.info("No maneuver was commanded at the selected time.")
+        else:
+            st.dataframe(recent_actions[["satellite", "maneuver_delta_v_m_s", "avoidance_delta_v_m_s", "fuel_remaining_kg"]], hide_index=True, width="stretch")
 
-st.caption(
-    "Control altitude is a simplified mean-orbit model. SGP4 ground tracks remain TLE-derived and are not "
-    "physically re-propagated after a virtual maneuver."
-)
+with ground_tracks:
+    st.subheader("Ground-track map")
+    st.caption("Lines show the simulated duration; red markers show the spacecraft position at the selected mission time.")
+    st.plotly_chart(ground_track_figure(telemetry, snapshot), width="stretch")
 
-st.subheader("Conjunction and avoidance alerts")
-alerts = telemetry[telemetry["conjunction_alert"]][
-    ["timestamp", "satellite", "closest_approach_km", "avoidance_status", "avoidance_delta_v_m_s"]
-]
-if alerts.empty:
-    st.success("No predicted close approaches crossed the selected keep-out distance.")
-else:
-    st.warning("Alerts are predicted closest approaches. Planned maneuvers are virtual until post-burn propagation is added.")
-    st.dataframe(alerts, use_container_width=True, hide_index=True)
+with orbital_web:
+    st.subheader("TEME orbital web")
+    st.caption("This inertial view uses SGP4 TEME coordinates. Coloured paths show the full simulation window; gold markers show the selected time.")
+    st.plotly_chart(orbital_web_figure(telemetry, snapshot), width="stretch")
 
-st.download_button(
-    "Download telemetry CSV",
-    telemetry.to_csv(index=False).encode("utf-8"),
-    file_name="constellation_telemetry.csv",
-    mime="text/csv",
-)
+with telemetry_tab:
+    st.subheader("Fleet telemetry at selected time")
+    st.dataframe(
+        snapshot[[
+            "satellite", "altitude_km", "controlled_mean_altitude_km", "latitude_deg", "longitude_deg",
+            "fuel_remaining_kg", "fuel_percent", "cumulative_delta_v_m_s", "maneuver_count",
+            "station_keeping_status", "conjunction_alert", "closest_approach_km", "avoidance_status",
+        ]], hide_index=True, width="stretch",
+    )
+    st.subheader("Conjunction and avoidance event log")
+    event_log = telemetry[telemetry["conjunction_alert"]][
+        ["timestamp", "satellite", "closest_approach_km", "avoidance_status", "avoidance_delta_v_m_s"]
+    ]
+    if event_log.empty:
+        st.success("No close approaches crossed the selected keep-out distance.")
+    else:
+        st.warning("Avoidance commands are virtual and fuel-accounted; their post-burn trajectory is not yet numerically re-propagated.")
+        st.dataframe(event_log, hide_index=True, width="stretch")
+    st.download_button("Download full telemetry CSV", telemetry.to_csv(index=False).encode("utf-8"), file_name="constellation_telemetry.csv", mime="text/csv")

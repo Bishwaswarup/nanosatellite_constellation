@@ -15,7 +15,7 @@
 \definecolor{fuel}{HTML}{2A9D8F}
 \definecolor{panel}{HTML}{EAF4F4}
 
-\title{Physics and Control Architecture\\\large AI-Optimized Nanosatellite Constellation Manager}
+\title{Physics, Control, and Command Architecture\\\large AI-Optimized Nanosatellite Constellation Manager -- Phase 4}
 \author{Technical Companion to the Python Simulation}
 \date{\today}
 
@@ -25,11 +25,12 @@
 \newpage
 
 \section{Purpose and scope}
-This document explains the physics represented by the project and how its code maps to an engineering workflow. The current implementation has two deliberately separate layers:
+This document explains the physics represented by the project and how its code maps to an engineering workflow. The current implementation has three deliberately separate layers:
 
 \begin{enumerate}
   \item \textbf{Authoritative trajectory layer.} A Two-Line Element set (TLE) is propagated using SGP4. Its output is an inertial position and velocity in the True Equator Mean Equinox (TEME) frame, transformed to the Earth-fixed ITRS/ECEF frame for ground tracks.
   \item \textbf{Control and resource layer.} A transparent, simplified mean-altitude model applies virtual orbital decay, commands an altitude-restoration burn, and tracks propellant through the rocket equation.
+  \item \textbf{Conjunction and command layer.} Pairwise Earth-fixed separation is screened at common timestamps. A deterministic, fuel-accounted virtual avoidance command is recorded whenever a selected keep-out zone is crossed.
 \end{enumerate}
 
 The control layer intentionally does \emph{not} edit a TLE or claim to re-propagate an SGP4 orbit after a burn. This keeps the dashboard honest: the map is TLE/SGP4-derived, while the resource telemetry is a station-keeping demonstration model. A maneuver-aware numerical propagator is the appropriate later upgrade.
@@ -185,6 +186,62 @@ The following plots are a deterministic illustration using a decay rate of \SI{1
 \caption{Illustrative propellant depletion for a low-thrust station-keeping sequence. Fuel declines monotonically and never becomes negative.}
 \end{figure}
 
+\section{Phase 3: conjunction screening and virtual avoidance}
+At each prediction timestamp, the software compares every unordered satellite pair. Given ECEF position vectors $\mathbf r_i$ and $\mathbf r_j$, their separation is
+\begin{equation}
+  d_{ij}=\left\|\mathbf r_i-\mathbf r_j\right\|.
+\end{equation}
+If $d_{ij}<d_{\mathrm{keepout}}$, the pair is an alert candidate. Consecutive below-threshold samples are collapsed to the sample with the smallest separation, preventing a prolonged close passage from generating duplicate alerts.
+
+The deterministic policy assigns one member of a flagged pair a retrograde phase-separation command. Its scale is a bounded approximation based on additional clearance accumulated over planning time $T$:
+\begin{equation}
+ \Delta v_{\mathrm{avoid}}=\operatorname{clip}\left(\frac{1000\left(1.25d_{\mathrm{keepout}}-d_{\mathrm{closest}}\right)}{T},\Delta v_{\min},\Delta v_{\max}\right).
+\end{equation}
+The command consumes fuel using the same rocket equation as station keeping. It is labelled \texttt{MANEUVER\_PLANNED}, rather than a verified collision resolution, until the post-burn orbit is numerically propagated.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[scale=.9,>=Stealth]
+\draw[orbit,very thick] (-4,0) -- (4,0) node[right] {relative encounter path};
+\fill[space] (0,0) circle (.12);
+\draw[burn,dashed,thick] (0,0) circle (1.45);
+\node[burn] at (0,-1.75) {keep-out radius};
+\fill[orbit] (-2.6,0) circle (3pt) node[above] {satellite A};
+\fill[fuel] (2.6,0) circle (3pt) node[above] {satellite B};
+\draw[-{Stealth},burn,thick] (2.6,0) -- (2.0,0) node[midway,below] {retrograde $\Delta v$};
+\draw[<->,thick] (0,.45) -- (2.6,.45) node[midway,above] {$d_{\mathrm{closest}}$};
+\end{tikzpicture}
+\caption{Conceptual conjunction screen and virtual phase-separation command.}
+\end{figure}
+
+\section{Phase 4: command-center dashboard}
+The Streamlit command center turns the simulation table into an operator-oriented interface. A mission-time selector creates one coherent UTC fleet snapshot, so every map marker, orbital marker, and status row refers to the same instant.
+
+\begin{enumerate}
+ \item \textbf{Overview:} fleet altitude, resource health, and active alerts.
+ \item \textbf{Ground tracks:} geodetic latitude/longitude paths with selected-time markers.
+ \item \textbf{3D orbital web:} TEME trajectories around a reference Earth sphere.
+ \item \textbf{Telemetry and alerts:} resources, maneuvers, conjunction fields, and complete CSV export.
+\end{enumerate}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[node distance=7mm and 8mm,every node/.style={font=\small},view/.style={draw=space,rounded corners=3pt,fill=panel,align=center,minimum height=10mm,text width=34mm},arrow/.style={-{Stealth},thick,draw=space}]
+\node[view] (time) {Mission-time selector\\one common UTC snapshot};
+\node[view,below left=of time] (map) {2D ground-track map\\ECEF / geodetic};
+\node[view,below=of time] (web) {3D orbital web\\TEME / inertial};
+\node[view,below right=of time] (ops) {Fleet telemetry\\fuel + alerts};
+\node[view,below=of web] (csv) {Downloadable CSV\\full simulation history};
+\draw[arrow] (time) -- (map);
+\draw[arrow] (time) -- (web);
+\draw[arrow] (time) -- (ops);
+\draw[arrow] (map) -- (csv);
+\draw[arrow] (web) -- (csv);
+\draw[arrow] (ops) -- (csv);
+\end{tikzpicture}
+\caption{Phase 4 command-center interaction model.}
+\end{figure}
+
 \section{Telemetry dictionary}
 \begin{center}
 \begin{tabular}{lll}
@@ -198,13 +255,16 @@ Field & Unit & Meaning \\
 \texttt{cumulative\_delta\_v\_m\_s} & m/s & Total delta-v spent by that satellite \\
 \texttt{fuel\_remaining\_kg} & kg & Remaining virtual propellant \\
 \texttt{station\_keeping\_status} & -- & \texttt{NOMINAL}, \texttt{MANEUVER}, or \texttt{OUT\_OF\_FUEL} \\
+\texttt{conjunction\_alert} & -- & Whether this satellite belongs to a flagged close-approach pair \\
+\texttt{closest\_approach\_km} & km & Minimum sampled separation for its conjunction event \\
+\texttt{avoidance\_status} & -- & \texttt{CLEAR}, \texttt{MANEUVER\_PLANNED}, or \texttt{OUT\_OF\_FUEL} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\section{Model limits and the Phase 3 path}
+\section{Model limits and the Phase 5 path}
 The present model is appropriate for demonstrating systems engineering connections: TLE ingestion, frame conversion, feedback control, delta-v budgeting, and a dashboard. It is not a mission-design-grade orbit determination system. Specifically, it does not yet include drag density models, covariance propagation, thrust direction errors, eclipse constraints, or post-burn numerical propagation.
 
-Phase 3 should add a rolling conjunction screen: propagate all satellite pairs over a prediction window, calculate closest approach, raise an alert below a keep-out radius, apply a deterministic phasing maneuver, then re-screen. Only after that deterministic baseline is validated should a learned policy be considered.
+The next engineering upgrade is numerical post-maneuver propagation: convert a planned burn into a state-vector update, propagate it with a maneuver-aware force model, and re-screen the resulting trajectories. Only after this deterministic baseline is validated should a learned policy be considered.
 
 \end{document}
