@@ -2,7 +2,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+import pandas as pd
 
+from src.avoidance import CollisionAvoidanceConfig, plan_avoidance_maneuvers, screen_conjunctions
 from src.control import circular_orbit_raise_delta_v_m_s, propellant_required_kg
 from src.models import StationKeepingConfig
 from src.propagation import load_tles
@@ -59,3 +61,24 @@ def test_orbit_raise_and_rocket_equation_are_positive():
             datetime(2026, 8, 9, tzinfo=timezone.utc),
             station_keeping=StationKeepingConfig(altitude_tolerance_km=0),
         )
+
+
+def test_conjunction_screen_finds_one_closest_approach_per_encounter():
+    timestamps = pd.to_datetime(["2026-08-09T00:00:00Z", "2026-08-09T00:01:00Z", "2026-08-09T00:02:00Z"])
+    telemetry = pd.DataFrame(
+        [
+            {"timestamp": timestamps[0], "satellite": "A", "ecef_x_km": 0, "ecef_y_km": 0, "ecef_z_km": 0},
+            {"timestamp": timestamps[0], "satellite": "B", "ecef_x_km": 4, "ecef_y_km": 0, "ecef_z_km": 0},
+            {"timestamp": timestamps[1], "satellite": "A", "ecef_x_km": 0, "ecef_y_km": 0, "ecef_z_km": 0},
+            {"timestamp": timestamps[1], "satellite": "B", "ecef_x_km": 1, "ecef_y_km": 0, "ecef_z_km": 0},
+            {"timestamp": timestamps[2], "satellite": "A", "ecef_x_km": 0, "ecef_y_km": 0, "ecef_z_km": 0},
+            {"timestamp": timestamps[2], "satellite": "B", "ecef_x_km": 5, "ecef_y_km": 0, "ecef_z_km": 0},
+        ]
+    )
+    config = CollisionAvoidanceConfig(keep_out_distance_km=2)
+    events = screen_conjunctions(telemetry, config)
+    plans = plan_avoidance_maneuvers(events, config)
+    assert len(events) == 1
+    assert events.iloc[0]["closest_approach_km"] == 1
+    assert plans.iloc[0]["maneuver_satellite"] == "B"
+    assert plans.iloc[0]["avoidance_delta_v_m_s"] > 0

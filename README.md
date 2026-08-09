@@ -1,6 +1,6 @@
 # AI-Optimized Nanosatellite Constellation Manager
 
-Phase 2 is a reproducible TLE-based constellation simulation. It propagates five sample low-Earth-orbit satellites with SGP4, transforms their positions from TEME to ECEF/ITRS, and produces ground-track and altitude telemetry. A deterministic control model applies virtual orbital decay, commands idealized altitude-restoration maneuvers, and tracks fuel use through the rocket equation.
+Phase 3 is a reproducible TLE-based constellation simulation. It propagates five sample low-Earth-orbit satellites with SGP4, transforms their positions from TEME to ECEF/ITRS, and produces ground-track and altitude telemetry. A deterministic control model applies virtual orbital decay, commands idealized altitude-restoration maneuvers, tracks fuel use through the rocket equation, and screens the constellation for close approaches.
 
 ## Run
 
@@ -25,6 +25,7 @@ python3 -m pytest
 - Geodetic latitude, longitude, and altitude telemetry
 - Virtual orbital decay and deterministic station-keeping maneuvers
 - Hohmann-transfer delta-v and Tsiolkovsky propellant accounting
+- Pairwise ECEF conjunction screening and deterministic virtual avoidance planning
 - 2D ground tracks, 3D latest-position visualization, and live fuel telemetry
 
-The controller operates on a simplified mean-orbit altitude estimate. It deliberately does not modify a TLE or alter the SGP4 ground track after a burn; physical post-maneuver propagation belongs in a later numerical-propagation phase. Conjunction screening and collision-avoidance maneuvers are the next phase.
+The controller operates on a simplified mean-orbit altitude estimate. It deliberately does not modify a TLE or alter the SGP4 ground track after a burn. Collision avoidance similarly produces a fuel-accounted virtual maneuver plan but does not yet re-propagate the post-burn trajectory. Physical post-maneuver propagation belongs in a later numerical-propagation phase.

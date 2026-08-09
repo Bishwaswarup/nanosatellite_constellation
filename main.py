@@ -7,6 +7,7 @@ import plotly.express as px
 import streamlit as st
 
 from src.models import StationKeepingConfig
+from src.avoidance import CollisionAvoidanceConfig
 from src.simulation import simulate_tle_constellation
 
 PROJECT_ROOT = Path(__file__).parent
@@ -24,6 +25,8 @@ with st.sidebar:
     decay_rate = st.slider("Virtual decay (km/day)", 0.1, 2.0, 0.5, 0.1)
     altitude_tolerance = st.slider("Altitude tolerance (km)", 0.05, 1.0, 0.25, 0.05)
     initial_propellant = st.slider("Initial propellant (kg)", 0.1, 10.0, 2.0, 0.1)
+    st.header("Collision avoidance")
+    keep_out_distance = st.slider("Keep-out distance (km)", 1.0, 2_000.0, 2.0, 1.0)
     run = st.button("Run propagation", type="primary")
 
 if run or "telemetry" not in st.session_state:
@@ -38,16 +41,18 @@ if run or "telemetry" not in st.session_state:
                 altitude_tolerance_km=altitude_tolerance,
                 initial_propellant_kg=initial_propellant,
             ),
+            collision_avoidance=CollisionAvoidanceConfig(keep_out_distance_km=keep_out_distance),
         )
 
 telemetry = st.session_state.telemetry
 latest = telemetry[telemetry["timestamp"] == telemetry["timestamp"].max()].copy()
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric("Satellites", latest["satellite"].nunique())
 col2.metric("Telemetry samples", f"{len(telemetry):,}")
 col3.metric("Mean altitude", f"{latest['altitude_km'].mean():.1f} km")
 col4.metric("Station-keeping burns", int(telemetry["station_keeping_event"].sum()))
+col5.metric("Avoidance commands", int(telemetry["avoidance_event"].sum()))
 
 st.subheader("Ground tracks")
 ground_track = px.line_geo(
@@ -89,11 +94,19 @@ st.caption(
     "physically re-propagated after a virtual maneuver."
 )
 
+st.subheader("Conjunction and avoidance alerts")
+alerts = telemetry[telemetry["conjunction_alert"]][
+    ["timestamp", "satellite", "closest_approach_km", "avoidance_status", "avoidance_delta_v_m_s"]
+]
+if alerts.empty:
+    st.success("No predicted close approaches crossed the selected keep-out distance.")
+else:
+    st.warning("Alerts are predicted closest approaches. Planned maneuvers are virtual until post-burn propagation is added.")
+    st.dataframe(alerts, use_container_width=True, hide_index=True)
+
 st.download_button(
     "Download telemetry CSV",
     telemetry.to_csv(index=False).encode("utf-8"),
     file_name="constellation_telemetry.csv",
     mime="text/csv",
 )
-
-
