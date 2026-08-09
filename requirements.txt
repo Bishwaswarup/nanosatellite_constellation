@@ -1,0 +1,6 @@
+astropy>=6.1
+pandas>=2.2
+plotly>=5.24
+sgp4>=2.23
+streamlit>=1.39
+pytest>=8.3
