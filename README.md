@@ -1,6 +1,6 @@
 # AI-Optimized Nanosatellite Constellation Manager
 
-Phase 3 is a reproducible TLE-based constellation simulation. It propagates five sample low-Earth-orbit satellites with SGP4, transforms their positions from TEME to ECEF/ITRS, and produces ground-track and altitude telemetry. A deterministic control model applies virtual orbital decay, commands idealized altitude-restoration maneuvers, tracks fuel use through the rocket equation, and screens the constellation for close approaches.
+This is a reproducible, simulation-only TLE-based constellation manager. It propagates five sample low-Earth-orbit satellites with SGP4, transforms their positions from TEME to ECEF/ITRS, and produces ground-track and altitude telemetry. A deterministic controller applies virtual orbital decay, commands idealized altitude-restoration maneuvers, tracks fuel use through the rocket equation, and screens the constellation for close approaches. A lightweight AI risk score prioritizes and explains candidate events; it never replaces deterministic keep-out or post-burn clearance checks.
 
 ## Run
 
@@ -26,6 +26,9 @@ python3 -m pytest
 - Virtual orbital decay and deterministic station-keeping maneuvers
 - Hohmann-transfer delta-v and Tsiolkovsky propellant accounting
 - Pairwise ECEF conjunction screening and deterministic virtual avoidance planning
+- RK4 two-body numerical propagation with instantaneous prograde/retrograde burn updates
+- Deterministic, synthetic-data-calibrated logistic collision-risk scores using relative state, time to closest approach, predicted separation, and the keep-out distance
+- AI-risk telemetry, event-log, CSV, dashboard, and synthetic-lab views
 - 2D ground tracks, 3D latest-position visualization, and live fuel telemetry
 
-The controller operates on a simplified mean-orbit altitude estimate. It deliberately does not modify a TLE or alter the SGP4 ground track after a burn. Collision avoidance similarly produces a fuel-accounted virtual maneuver plan but does not yet re-propagate the post-burn trajectory. Physical post-maneuver propagation belongs in a later numerical-propagation phase.
+The controller operates on a simplified mean-orbit altitude estimate and deliberately does not modify a TLE or alter the SGP4 ground track after a burn. Avoidance plans are re-propagated with a two-body RK4 model to the conjunction time and labelled `CLEARED` or `INSUFFICIENT`; that numerical check and the deterministic keep-out threshold remain authoritative. The AI score is simulation/decision-support only, not an operational collision-avoidance system.

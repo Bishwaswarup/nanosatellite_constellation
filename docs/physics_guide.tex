@@ -15,7 +15,7 @@
 \definecolor{fuel}{HTML}{2A9D8F}
 \definecolor{panel}{HTML}{EAF4F4}
 
-\title{Physics, Control, and Command Architecture\\\large AI-Optimized Nanosatellite Constellation Manager -- Phase 4}
+\title{Physics, Control, and Command Architecture\\\large AI-Optimized Nanosatellite Constellation Manager -- Phase 6}
 \author{Technical Companion to the Python Simulation}
 \date{\today}
 
@@ -25,12 +25,13 @@
 \newpage
 
 \section{Purpose and scope}
-This document explains the physics represented by the project and how its code maps to an engineering workflow. The current implementation has three deliberately separate layers:
+This document explains the physics represented by the project and how its code maps to an engineering workflow. The current implementation has four deliberately separate layers:
 
 \begin{enumerate}
   \item \textbf{Authoritative trajectory layer.} A Two-Line Element set (TLE) is propagated using SGP4. Its output is an inertial position and velocity in the True Equator Mean Equinox (TEME) frame, transformed to the Earth-fixed ITRS/ECEF frame for ground tracks.
   \item \textbf{Control and resource layer.} A transparent, simplified mean-altitude model applies virtual orbital decay, commands an altitude-restoration burn, and tracks propellant through the rocket equation.
   \item \textbf{Conjunction and command layer.} Pairwise Earth-fixed separation is screened at common timestamps. A deterministic, fuel-accounted virtual avoidance command is recorded whenever a selected keep-out zone is crossed.
+  \item \textbf{Advisory AI-risk layer.} A small, reproducible logistic model prioritizes deterministic candidates using relative motion. It cannot create, suppress, approve, or reject a safety action.
 \end{enumerate}
 
 The control layer intentionally does \emph{not} edit a TLE or claim to re-propagate an SGP4 orbit after a burn. This keeps the dashboard honest: the map is TLE/SGP4-derived, while the resource telemetry is a station-keeping demonstration model. A maneuver-aware numerical propagator is the appropriate later upgrade.
@@ -242,6 +243,31 @@ The Streamlit command center turns the simulation table into an operator-oriente
 \caption{Phase 4 command-center interaction model.}
 \end{figure}
 
+\section{Advisory AI/ML collision-risk scoring}
+The risk score is deliberately lightweight and fully reproducible: it is a fixed logistic-regression-style model with no live feeds, external services, stochastic training, or hidden state. Its coefficients were calibrated against synthetic relative-motion examples solely to provide a smooth, interpretable priority signal in this simulation. For a relative TEME position $\Delta\mathbf r$, relative TEME velocity $\Delta\mathbf v$, and linearized time to closest approach,
+\begin{align}
+ t_{\mathrm{TCA}} &= \max\left(0,-\frac{\Delta\mathbf r\cdot\Delta\mathbf v}{\|\Delta\mathbf v\|^2}\right),\\
+ d_{\mathrm{pred}} &= \|\Delta\mathbf r+t_{\mathrm{TCA}}\Delta\mathbf v\|.
+\end{align}
+The model receives $\Delta\mathbf r$, $\Delta\mathbf v$, $t_{\mathrm{TCA}}$, $d_{\mathrm{pred}}$, and the configured keep-out distance $d_k$. It maps normalized proximity, current distance, relative speed, and temporal urgency through a sigmoid $p=(1+e^{-z})^{-1}$. The resulting $p$ is labelled \texttt{LOW}, \texttt{ELEVATED}, \texttt{HIGH}, or \texttt{CRITICAL}. It is a calibrated-for-simulation priority score, not a physical probability of collision.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[node distance=8mm and 9mm,every node/.style={font=\small},box/.style={draw=space,rounded corners=3pt,fill=panel,align=center,minimum height=10mm,text width=34mm},safe/.style={draw=fuel,rounded corners=3pt,fill=green!8,align=center,minimum height=10mm,text width=34mm},arr/.style={-{Stealth},thick,draw=space}]
+\node[box] (state) {Relative TEME state\\$\Delta\mathbf r,\Delta\mathbf v$};
+\node[box,right=of state] (ml) {Fixed synthetic-calibrated\\risk score $p$, label};
+\node[box,below=of state] (screen) {Deterministic keep-out\\screen $d<d_k$};
+\node[safe,right=of screen] (verify) {RK4 post-burn re-screen\\\texttt{CLEARED}/\texttt{INSUFFICIENT}};
+\draw[arr] (state) -- (ml);
+\draw[arr] (state) -- (screen);
+\draw[arr] (screen) -- (verify);
+\draw[arr,dashed] (ml) -- node[right,align=left]{prioritize / explain only\\no authority} (verify);
+\end{tikzpicture}
+\caption{Safety architecture. The dashed advisory path cannot override deterministic screening or numerical verification.}
+\end{figure}
+
+The CSV, per-satellite telemetry, and conjunction log preserve \texttt{relative\_position\_km}, \texttt{relative\_velocity\_km\_s}, \texttt{time\_to\_closest\_approach\_s}, \texttt{predicted\_closest\_separation\_km}, \texttt{keep\_out\_distance\_km}, \texttt{ai\_risk\_probability}, and \texttt{ai\_risk\_label}. The synthetic dashboard lab reports the score before its unsafe intercept and after its maneuvered pass alongside their separations.
+
 \section{Telemetry dictionary}
 \begin{center}
 \begin{tabular}{lll}
@@ -258,6 +284,8 @@ Field & Unit & Meaning \\
 \texttt{conjunction\_alert} & -- & Whether this satellite belongs to a flagged close-approach pair \\
 \texttt{closest\_approach\_km} & km & Minimum sampled separation for its conjunction event \\
 \texttt{avoidance\_status} & -- & \texttt{CLEAR}, \texttt{MANEUVER\_PLANNED}, or \texttt{OUT\_OF\_FUEL} \\
+\texttt{ai\_risk\_probability} & 0--1 & Advisory synthetic-calibrated encounter-priority score \\
+\texttt{ai\_risk\_label} & -- & \texttt{LOW}, \texttt{ELEVATED}, \texttt{HIGH}, or \texttt{CRITICAL} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -265,6 +293,8 @@ Field & Unit & Meaning \\
 \section{Model limits and the Phase 5 path}
 The present model is appropriate for demonstrating systems engineering connections: TLE ingestion, frame conversion, feedback control, delta-v budgeting, and a dashboard. It is not a mission-design-grade orbit determination system. Specifically, it does not yet include drag density models, covariance propagation, thrust direction errors, eclipse constraints, or post-burn numerical propagation.
 
-The next engineering upgrade is numerical post-maneuver propagation: convert a planned burn into a state-vector update, propagate it with a maneuver-aware force model, and re-screen the resulting trajectories. Only after this deterministic baseline is validated should a learned policy be considered.
+Phase 5 adds the first maneuver-aware validation component: a TEME Cartesian state receives an instantaneous prograde or retrograde velocity update, then advances under central Earth gravity using fourth-order Runge--Kutta integration. The numerical model is deliberately a two-body baseline; it is suitable for checking the directional effect of a planned burn, but a production system must add J2, drag, third bodies, Earth orientation, and covariance handling before interpreting a re-screen as operationally valid.
+
+The AI layer adds further limits: it has no tracking covariance, object size, attitude, maneuver uncertainty, high-fidelity force model, sensor data, or operational calibration data. Linearized TCA is only a feature, not an orbit propagator. Therefore this software is a simulation and decision-support demonstrator, \emph{not} an operational collision-avoidance system; humans and validated deterministic flight-dynamics processes must retain authority.
 
 \end{document}

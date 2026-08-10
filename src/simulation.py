@@ -6,10 +6,12 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 
 from .avoidance import CollisionAvoidanceConfig, plan_avoidance_maneuvers, screen_conjunctions
 from .control import advance_station_keeping, initialize_state, propellant_required_kg
 from .models import StationKeepingConfig
+from .numerical import apply_velocity_burn, propagate_two_body
 from .propagation import load_tles, propagate_constellation
 
 
@@ -42,12 +44,32 @@ def simulate_tle_constellation(
 
     control_config = station_keeping or StationKeepingConfig()
     plans = plan_avoidance_maneuvers(screen_conjunctions(frame, collision_avoidance), collision_avoidance) if collision_avoidance else pd.DataFrame()
+    if not plans.empty:
+        available_times = list(frame["timestamp"].drop_duplicates().sort_values())
+        for index, plan in plans.iterrows():
+            desired_time = plan["timestamp"] - timedelta(seconds=collision_avoidance.planning_lead_seconds)
+            maneuver_time = max((time for time in available_times if time <= desired_time), default=available_times[0])
+            target = frame[(frame["timestamp"] == maneuver_time) & (frame["satellite"] == plan["maneuver_satellite"])].iloc[0]
+            protected = frame[(frame["timestamp"] == plan["timestamp"]) & (frame["satellite"] == plan["satellite_a"])].iloc[0]
+            duration_s = (plan["timestamp"] - maneuver_time).total_seconds()
+            burned_velocity = apply_velocity_burn(
+                target[["teme_vx_km_s", "teme_vy_km_s", "teme_vz_km_s"]].to_numpy(float),
+                float(plan["avoidance_delta_v_m_s"]), plan["maneuver_direction"],
+            )
+            propagated_position, _ = propagate_two_body(
+                target[["teme_x_km", "teme_y_km", "teme_z_km"]].to_numpy(float), burned_velocity, duration_s,
+            )
+            protected_position = protected[["teme_x_km", "teme_y_km", "teme_z_km"]].to_numpy(float)
+            separation = float(np.linalg.norm(propagated_position - protected_position))
+            plans.loc[index, "maneuver_timestamp"] = maneuver_time
+            plans.loc[index, "predicted_post_burn_separation_km"] = separation
+            plans.loc[index, "avoidance_effectiveness"] = "CLEARED" if separation >= collision_avoidance.keep_out_distance_km else "INSUFFICIENT"
     alert_map: dict[tuple[object, str], dict[str, object]] = {}
     maneuver_map: dict[tuple[object, str], dict[str, object]] = {}
     for _, plan in plans.iterrows():
         for satellite in (plan["satellite_a"], plan["satellite_b"]):
             alert_map[(plan["timestamp"], satellite)] = plan.to_dict()
-        maneuver_map[(plan["timestamp"], plan["maneuver_satellite"])] = plan.to_dict()
+        maneuver_map[(plan.get("maneuver_timestamp", plan["timestamp"]), plan["maneuver_satellite"])] = plan.to_dict()
 
     controlled_rows: list[dict[str, object]] = []
     for _, satellite_rows in frame.groupby("satellite", sort=False):
@@ -63,9 +85,18 @@ def simulate_tle_constellation(
                 {
                     "conjunction_alert": alert is not None,
                     "closest_approach_km": float(alert["closest_approach_km"]) if alert else None,
+                    "relative_position_km": float(alert["relative_position_km"]) if alert and pd.notna(alert.get("relative_position_km")) else None,
+                    "relative_velocity_km_s": float(alert["relative_velocity_km_s"]) if alert and pd.notna(alert.get("relative_velocity_km_s")) else None,
+                    "time_to_closest_approach_s": float(alert["time_to_closest_approach_s"]) if alert and pd.notna(alert.get("time_to_closest_approach_s")) else None,
+                    "predicted_closest_separation_km": float(alert["predicted_closest_separation_km"]) if alert and pd.notna(alert.get("predicted_closest_separation_km")) else None,
+                    "keep_out_distance_km": float(alert["keep_out_distance_km"]) if alert and pd.notna(alert.get("keep_out_distance_km")) else collision_avoidance.keep_out_distance_km if collision_avoidance else None,
+                    "ai_risk_probability": float(alert["ai_risk_probability"]) if alert and pd.notna(alert.get("ai_risk_probability")) else None,
+                    "ai_risk_label": alert.get("ai_risk_label", "UNAVAILABLE") if alert else "CLEAR",
                     "avoidance_event": False,
                     "avoidance_delta_v_m_s": 0.0,
                     "avoidance_status": "CLEAR",
+                    "predicted_post_burn_separation_km": float(alert["predicted_post_burn_separation_km"]) if alert else None,
+                    "avoidance_effectiveness": alert.get("avoidance_effectiveness", "NOT_APPLICABLE") if alert else "NOT_APPLICABLE",
                 }
             )
             if plan is not None:
@@ -82,6 +113,15 @@ def simulate_tle_constellation(
                             "avoidance_event": True,
                             "avoidance_delta_v_m_s": delta_v,
                             "avoidance_status": "MANEUVER_PLANNED",
+                            "relative_position_km": float(plan["relative_position_km"]) if pd.notna(plan.get("relative_position_km")) else None,
+                            "relative_velocity_km_s": float(plan["relative_velocity_km_s"]) if pd.notna(plan.get("relative_velocity_km_s")) else None,
+                            "time_to_closest_approach_s": float(plan["time_to_closest_approach_s"]) if pd.notna(plan.get("time_to_closest_approach_s")) else None,
+                            "predicted_closest_separation_km": float(plan["predicted_closest_separation_km"]) if pd.notna(plan.get("predicted_closest_separation_km")) else None,
+                            "keep_out_distance_km": float(plan["keep_out_distance_km"]) if pd.notna(plan.get("keep_out_distance_km")) else collision_avoidance.keep_out_distance_km,
+                            "ai_risk_probability": float(plan["ai_risk_probability"]) if pd.notna(plan.get("ai_risk_probability")) else None,
+                            "ai_risk_label": plan.get("ai_risk_label", "UNAVAILABLE"),
+                            "predicted_post_burn_separation_km": float(plan["predicted_post_burn_separation_km"]),
+                            "avoidance_effectiveness": plan["avoidance_effectiveness"],
                         }
                     )
                 else:

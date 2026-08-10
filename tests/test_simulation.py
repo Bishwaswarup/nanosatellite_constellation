@@ -82,3 +82,16 @@ def test_conjunction_screen_finds_one_closest_approach_per_encounter():
     assert events.iloc[0]["closest_approach_km"] == 1
     assert plans.iloc[0]["maneuver_satellite"] == "B"
     assert plans.iloc[0]["avoidance_delta_v_m_s"] > 0
+
+
+def test_avoidance_plans_are_numerically_rescreened():
+    telemetry = simulate_tle_constellation(
+        TLE_FILE, datetime(2026, 8, 9, tzinfo=timezone.utc), duration_hours=2, step_seconds=600,
+        station_keeping=StationKeepingConfig(), collision_avoidance=CollisionAvoidanceConfig(keep_out_distance_km=2_000),
+    )
+    maneuvers = telemetry[telemetry["avoidance_event"]]
+    assert not maneuvers.empty
+    assert maneuvers["predicted_post_burn_separation_km"].notna().all()
+    assert set(maneuvers["avoidance_effectiveness"]) <= {"CLEARED", "INSUFFICIENT"}
+    assert maneuvers["ai_risk_probability"].between(0, 1).all()
+    assert set(maneuvers["ai_risk_label"]) <= {"LOW", "ELEVATED", "HIGH", "CRITICAL"}

@@ -4,10 +4,20 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="53a44010-1d70-4a43-bd3a-5ab2be95d4e5" name="Changes" comment="Phase 3">
+    <list default="true" id="53a44010-1d70-4a43-bd3a-5ab2be95d4e5" name="Changes" comment="Phase 4">
+      <change afterPath="$PROJECT_DIR$/src/numerical.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/risk_model.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test_scenario.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_numerical.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_risk_model.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_test_scenario.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/docs/physics_guide.tex" beforeDir="false" afterPath="$PROJECT_DIR$/docs/physics_guide.tex" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/avoidance.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/avoidance.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/simulation.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/simulation.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_simulation.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_simulation.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -17,27 +27,27 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 0,
-  "fromUser": false
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 0,
+  &quot;fromUser&quot;: false
+}</component>
   <component name="ProjectId" id="3HgSPFvZGcrR9No4si82sh5Ijva" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python.main.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "main",
-    "nodejs_package_manager_path": "npm"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.main.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;
   }
-}]]></component>
+}</component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
@@ -77,7 +87,15 @@
       <option name="project" value="LOCAL" />
       <updated>1786290687361</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Phase 4">
+      <option name="closed" value="true" />
+      <created>1786293706904</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1786293706904</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -90,6 +108,7 @@
     <MESSAGE value="Phase 2" />
     <MESSAGE value="Phase 2 (PHYSICS)" />
     <MESSAGE value="Phase 3" />
-    <option name="LAST_COMMIT_MESSAGE" value="Phase 3" />
+    <MESSAGE value="Phase 4" />
+    <option name="LAST_COMMIT_MESSAGE" value="Phase 4" />
   </component>
 </project>

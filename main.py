@@ -10,6 +10,7 @@ import streamlit as st
 from src.avoidance import CollisionAvoidanceConfig
 from src.models import StationKeepingConfig
 from src.simulation import simulate_tle_constellation
+from src.test_scenario import synthetic_safe_pass_figure, synthetic_scenario_risks
 
 PROJECT_ROOT = Path(__file__).parent
 DEFAULT_TLE_FILE = PROJECT_ROOT / "data" / "sample_constellation.tle"
@@ -88,7 +89,7 @@ def orbital_web_figure(telemetry, snapshot) -> go.Figure:
 
 st.set_page_config(page_title="Nanosatellite Constellation Manager", page_icon="🛰️", layout="wide")
 st.title("🛰️ Nanosatellite Constellation Manager")
-st.caption("Phase 4 command center — SGP4 tracking, station-keeping, conjunction screening, and resource telemetry")
+st.caption("Command center — SGP4 tracking, deterministic safety screening, advisory AI risk prioritization, and resource telemetry")
 
 with st.sidebar:
     st.header("Simulation controls")
@@ -127,7 +128,7 @@ with st.sidebar:
     st.metric("Mean fuel", f"{snapshot['fuel_percent'].mean():.2f}%")
     st.metric("Active alerts", len(active_alerts))
     st.dataframe(
-        snapshot[["satellite", "altitude_km", "fuel_percent", "station_keeping_status", "avoidance_status"]],
+        snapshot[["satellite", "altitude_km", "fuel_percent", "ai_risk_label", "station_keeping_status", "avoidance_status"]],
         hide_index=True, width="stretch",
         column_config={"altitude_km": st.column_config.NumberColumn("Altitude (km)", format="%.1f"), "fuel_percent": st.column_config.NumberColumn("Fuel (%)", format="%.2f")},
     )
@@ -139,7 +140,7 @@ metric_columns[2].metric("Minimum fuel", f"{snapshot['fuel_percent'].min():.2f}%
 metric_columns[3].metric("Station-keeping burns", int(telemetry["station_keeping_event"].sum()))
 metric_columns[4].metric("Avoidance commands", int(telemetry["avoidance_event"].sum()))
 
-overview, ground_tracks, orbital_web, telemetry_tab = st.tabs(["Overview", "Ground tracks", "3D orbital web", "Telemetry & alerts"])
+overview, ground_tracks, orbital_web, telemetry_tab, test_lab = st.tabs(["Overview", "Ground tracks", "3D orbital web", "Telemetry & alerts", "Synthetic test lab"])
 
 with overview:
     left, right = st.columns((3, 2))
@@ -152,7 +153,7 @@ with overview:
             st.success("No conjunction alert at the selected mission time.")
         else:
             st.error(f"{len(active_alerts)} satellite-side conjunction alert(s) active.")
-            st.dataframe(active_alerts[["satellite", "closest_approach_km", "avoidance_status"]], hide_index=True, width="stretch")
+            st.dataframe(active_alerts[["satellite", "closest_approach_km", "ai_risk_probability", "ai_risk_label", "avoidance_status"]], hide_index=True, width="stretch")
         recent_actions = snapshot[(snapshot["station_keeping_event"]) | (snapshot["avoidance_event"])]
         if recent_actions.empty:
             st.info("No maneuver was commanded at the selected time.")
@@ -176,15 +177,30 @@ with telemetry_tab:
             "satellite", "altitude_km", "controlled_mean_altitude_km", "latitude_deg", "longitude_deg",
             "fuel_remaining_kg", "fuel_percent", "cumulative_delta_v_m_s", "maneuver_count",
             "station_keeping_status", "conjunction_alert", "closest_approach_km", "avoidance_status",
+            "relative_position_km", "relative_velocity_km_s", "time_to_closest_approach_s",
+            "predicted_closest_separation_km", "keep_out_distance_km", "ai_risk_probability", "ai_risk_label",
         ]], hide_index=True, width="stretch",
     )
     st.subheader("Conjunction and avoidance event log")
     event_log = telemetry[telemetry["conjunction_alert"]][
-        ["timestamp", "satellite", "closest_approach_km", "avoidance_status", "avoidance_delta_v_m_s"]
+        ["timestamp", "satellite", "closest_approach_km", "predicted_closest_separation_km", "ai_risk_probability", "ai_risk_label", "avoidance_status", "avoidance_delta_v_m_s", "predicted_post_burn_separation_km", "avoidance_effectiveness"]
     ]
     if event_log.empty:
         st.success("No close approaches crossed the selected keep-out distance.")
     else:
-        st.warning("Avoidance commands are virtual and fuel-accounted; their post-burn trajectory is not yet numerically re-propagated.")
+        st.warning("AI risk is advisory only. Deterministic keep-out screening and numerical post-burn re-screening remain the safety authority.")
         st.dataframe(event_log, hide_index=True, width="stretch")
     st.download_button("Download full telemetry CSV", telemetry.to_csv(index=False).encode("utf-8"), file_name="constellation_telemetry.csv", mime="text/csv")
+
+with test_lab:
+    st.subheader("Synthetic close-approach validation")
+    st.caption("This local-frame animation is a controlled software test only; it does not represent or command a real satellite.")
+    scenario_figure, unsafe_distance, safe_distance = synthetic_safe_pass_figure()
+    unsafe_risk, safe_risk = synthetic_scenario_risks()
+    scenario_metrics = st.columns(4)
+    scenario_metrics[0].metric("Unmitigated closest approach", f"{unsafe_distance:.2f} km")
+    scenario_metrics[1].metric("Post-maneuver closest approach", f"{safe_distance:.2f} km")
+    scenario_metrics[2].metric("AI risk before", f"{unsafe_risk.probability:.1%}", unsafe_risk.label)
+    scenario_metrics[3].metric("AI risk after", f"{safe_risk.probability:.1%}", safe_risk.label)
+    st.caption("The score prioritizes the test case for review; safe/unsafe status still comes from the deterministic 2 km keep-out and verified separation.")
+    st.plotly_chart(scenario_figure, width="stretch")
