@@ -13,7 +13,10 @@ from src.simulation import simulate_tle_constellation
 from src.test_scenario import synthetic_safe_pass_figure, synthetic_scenario_risks
 
 PROJECT_ROOT = Path(__file__).parent
-DEFAULT_TLE_FILE = PROJECT_ROOT / "data" / "sample_constellation.tle"
+FLEET_OPTIONS = {
+    "Official 10-satellite LEO fleet": PROJECT_ROOT / "data" / "official_fleet_10.tle",
+    "Sample 5-satellite fleet": PROJECT_ROOT / "data" / "sample_constellation.tle",
+}
 EARTH_RADIUS_KM = 6378.137
 
 
@@ -87,12 +90,36 @@ def orbital_web_figure(telemetry, snapshot) -> go.Figure:
     return figure
 
 
-st.set_page_config(page_title="Nanosatellite Constellation Manager", page_icon="🛰️", layout="wide")
-st.title("🛰️ Nanosatellite Constellation Manager")
-st.caption("Command center — SGP4 tracking, deterministic safety screening, advisory AI risk prioritization, and resource telemetry")
+def risk_queue_figure(alerts) -> go.Figure:
+    """Plot the current deterministic alerts by their advisory review priority."""
+    ordered = alerts.sort_values("ai_risk_probability", ascending=True)
+    colors = {"CRITICAL": "#b42318", "HIGH": "#d97706", "ELEVATED": "#ca8a04", "LOW": "#2563eb"}
+    return go.Figure(
+        go.Bar(
+            x=ordered["ai_risk_probability"], y=ordered["satellite"], orientation="h",
+            marker_color=[colors.get(label, "#64748b") for label in ordered["ai_risk_label"]],
+            customdata=ordered[["ai_risk_label", "ai_primary_driver", "predicted_closest_separation_km"]],
+            hovertemplate="%{y}<br>Risk %{x:.1%}<br>Label %{customdata[0]}<br>Primary driver: %{customdata[1]}<br>Predicted separation: %{customdata[2]:.2f} km<extra></extra>",
+        )
+    ).update_layout(
+        height=260, margin={"l": 0, "r": 0, "t": 10, "b": 0}, xaxis={"title": "Advisory risk probability", "tickformat": ".0%", "range": [0, 1]}, yaxis={"title": ""}, showlegend=False,
+    )
+
+
+st.set_page_config(page_title="Nanosatellite Constellation Manager", layout="wide")
+st.markdown("""<style>
+    .block-container {max-width: 1500px; padding-top: 2rem;}
+    [data-testid="stMetric"] {background: #171923; border: 1px solid #3b4252; border-radius: 7px; padding: .65rem .8rem;}
+    [data-testid="stMetricLabel"], [data-testid="stMetricValue"], [data-testid="stMetricDelta"] {color: #f8fafc;}
+    h1, h2, h3 {color: inherit;}
+</style>""", unsafe_allow_html=True)
+st.title("Nanosatellite Constellation Manager")
+st.caption("SGP4 tracking | deterministic safety screening | advisory risk prioritization | resource telemetry")
 
 with st.sidebar:
     st.header("Simulation controls")
+    fleet_name = st.selectbox("Fleet scenario", options=list(FLEET_OPTIONS), help="The official fleet uses archived CelesTrak TLEs. It is not a live operational feed.")
+    tle_file = FLEET_OPTIONS[fleet_name]
     duration_hours = st.slider("Duration (hours)", 1, 24, 24)
     step_seconds = st.select_slider("Timestep (seconds)", options=[60, 120, 300, 600], value=300)
     st.divider()
@@ -104,10 +131,10 @@ with st.sidebar:
     keep_out_distance = st.slider("Keep-out distance (km)", 1.0, 2_000.0, 2.0, 1.0)
     run = st.button("Run simulation", type="primary", width="stretch")
 
-if run or "telemetry" not in st.session_state:
+if run or st.session_state.get("fleet_scenario") != fleet_name or "telemetry" not in st.session_state:
     with st.spinner("Propagating constellation and screening conjunctions…"):
         st.session_state.telemetry = simulate_tle_constellation(
-            DEFAULT_TLE_FILE, start=datetime.now(timezone.utc), duration_hours=duration_hours,
+            tle_file, start=datetime.now(timezone.utc), duration_hours=duration_hours,
             step_seconds=step_seconds,
             station_keeping=StationKeepingConfig(
                 decay_rate_km_per_day=decay_rate, altitude_tolerance_km=altitude_tolerance,
@@ -115,6 +142,7 @@ if run or "telemetry" not in st.session_state:
             ),
             collision_avoidance=CollisionAvoidanceConfig(keep_out_distance_km=keep_out_distance),
         )
+        st.session_state.fleet_scenario = fleet_name
 
 telemetry = st.session_state.telemetry
 timestamps = list(telemetry["timestamp"].drop_duplicates().sort_values())
@@ -139,6 +167,7 @@ metric_columns[1].metric("Mean altitude", f"{snapshot['altitude_km'].mean():.1f}
 metric_columns[2].metric("Minimum fuel", f"{snapshot['fuel_percent'].min():.2f}%")
 metric_columns[3].metric("Station-keeping burns", int(telemetry["station_keeping_event"].sum()))
 metric_columns[4].metric("Avoidance commands", int(telemetry["avoidance_event"].sum()))
+st.caption(f"Scenario: {fleet_name}. {snapshot['satellite'].nunique() * (snapshot['satellite'].nunique() - 1) // 2:,} pairwise comparisons per prediction timestamp.")
 
 overview, ground_tracks, orbital_web, telemetry_tab, test_lab = st.tabs(["Overview", "Ground tracks", "3D orbital web", "Telemetry & alerts", "Synthetic test lab"])
 
@@ -153,7 +182,7 @@ with overview:
             st.success("No conjunction alert at the selected mission time.")
         else:
             st.error(f"{len(active_alerts)} satellite-side conjunction alert(s) active.")
-            st.dataframe(active_alerts[["satellite", "closest_approach_km", "ai_risk_probability", "ai_risk_label", "avoidance_status"]], hide_index=True, width="stretch")
+            st.dataframe(active_alerts[["satellite", "closest_approach_km", "ai_risk_probability", "ai_risk_label", "ai_primary_driver", "avoidance_status"]], hide_index=True, width="stretch")
         recent_actions = snapshot[(snapshot["station_keeping_event"]) | (snapshot["avoidance_event"])]
         if recent_actions.empty:
             st.info("No maneuver was commanded at the selected time.")
@@ -179,17 +208,23 @@ with telemetry_tab:
             "station_keeping_status", "conjunction_alert", "closest_approach_km", "avoidance_status",
             "relative_position_km", "relative_velocity_km_s", "time_to_closest_approach_s",
             "predicted_closest_separation_km", "keep_out_distance_km", "ai_risk_probability", "ai_risk_label",
+            "ai_primary_driver", "ai_model_version",
         ]], hide_index=True, width="stretch",
     )
     st.subheader("Conjunction and avoidance event log")
     event_log = telemetry[telemetry["conjunction_alert"]][
-        ["timestamp", "satellite", "closest_approach_km", "predicted_closest_separation_km", "ai_risk_probability", "ai_risk_label", "avoidance_status", "avoidance_delta_v_m_s", "predicted_post_burn_separation_km", "avoidance_effectiveness"]
+        ["timestamp", "satellite", "closest_approach_km", "predicted_closest_separation_km", "ai_risk_probability", "ai_risk_label", "ai_primary_driver", "avoidance_status", "avoidance_delta_v_m_s", "predicted_post_burn_separation_km", "avoidance_effectiveness"]
     ]
     if event_log.empty:
         st.success("No close approaches crossed the selected keep-out distance.")
     else:
         st.warning("AI risk is advisory only. Deterministic keep-out screening and numerical post-burn re-screening remain the safety authority.")
-        st.dataframe(event_log, hide_index=True, width="stretch")
+        risk_column, log_column = st.columns((2, 3))
+        with risk_column:
+            st.caption("Advisory risk queue")
+            st.plotly_chart(risk_queue_figure(event_log), width="stretch")
+        with log_column:
+            st.dataframe(event_log, hide_index=True, width="stretch")
     st.download_button("Download full telemetry CSV", telemetry.to_csv(index=False).encode("utf-8"), file_name="constellation_telemetry.csv", mime="text/csv")
 
 with test_lab:
@@ -200,7 +235,8 @@ with test_lab:
     scenario_metrics = st.columns(4)
     scenario_metrics[0].metric("Unmitigated closest approach", f"{unsafe_distance:.2f} km")
     scenario_metrics[1].metric("Post-maneuver closest approach", f"{safe_distance:.2f} km")
-    scenario_metrics[2].metric("AI risk before", f"{unsafe_risk.probability:.1%}", unsafe_risk.label)
-    scenario_metrics[3].metric("AI risk after", f"{safe_risk.probability:.1%}", safe_risk.label)
+    scenario_metrics[2].metric("AI risk before", f"{unsafe_risk.probability:.1%}")
+    scenario_metrics[3].metric("AI risk after", f"{safe_risk.probability:.1%}")
+    st.caption(f"Before: {unsafe_risk.label}, primarily driven by {unsafe_risk.primary_driver}. After: {safe_risk.label}, primarily driven by {safe_risk.primary_driver}.")
     st.caption("The score prioritizes the test case for review; safe/unsafe status still comes from the deterministic 2 km keep-out and verified separation.")
     st.plotly_chart(scenario_figure, width="stretch")

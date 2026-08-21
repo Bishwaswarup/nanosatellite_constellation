@@ -243,6 +243,11 @@ The Streamlit command center turns the simulation table into an operator-oriente
 \caption{Phase 4 command-center interaction model.}
 \end{figure}
 
+\subsection{Fleet scenarios and scale}
+The dashboard offers a five-object sample and a ten-object archived operational-satellite scenario. The latter contains ISS, HST, Terra, Aqua, Suomi NPP, Landsat 8, Landsat 9, Sentinel-1A, Sentinel-2A, and NOAA-20. Its TLEs are a static CelesTrak active-catalogue snapshot with epoch day 2026--220, retained in the repository for reproducibility rather than fetched at run time. Accordingly, the data are not live tracking information and must never be treated as operational ephemerides.
+
+For $N$ spacecraft, the same-timestamp conjunction screen evaluates $N(N-1)/2$ unordered pairs. The five-object sample has 10 comparisons per timestamp; the ten-object fleet has 45. The dashboard displays this count with the selected scenario so that a future larger synthetic fleet can be assessed with an appropriate timestep and display filtering strategy.
+
 \section{Advisory AI/ML collision-risk scoring}
 The risk score is deliberately lightweight and fully reproducible: it is a fixed logistic-regression-style model with no live feeds, external services, stochastic training, or hidden state. Its coefficients were calibrated against synthetic relative-motion examples solely to provide a smooth, interpretable priority signal in this simulation. For a relative TEME position $\Delta\mathbf r$, relative TEME velocity $\Delta\mathbf v$, and linearized time to closest approach,
 \begin{align}
@@ -266,7 +271,7 @@ The model receives $\Delta\mathbf r$, $\Delta\mathbf v$, $t_{\mathrm{TCA}}$, $d_
 \caption{Safety architecture. The dashed advisory path cannot override deterministic screening or numerical verification.}
 \end{figure}
 
-The CSV, per-satellite telemetry, and conjunction log preserve \texttt{relative\_position\_km}, \texttt{relative\_velocity\_km\_s}, \texttt{time\_to\_closest\_approach\_s}, \texttt{predicted\_closest\_separation\_km}, \texttt{keep\_out\_distance\_km}, \texttt{ai\_risk\_probability}, and \texttt{ai\_risk\_label}. The synthetic dashboard lab reports the score before its unsafe intercept and after its maneuvered pass alongside their separations.
+The CSV, per-satellite telemetry, and conjunction log preserve \texttt{relative\_position\_km}, \texttt{relative\_velocity\_km\_s}, \texttt{time\_to\_closest\_approach\_s}, \texttt{predicted\_closest\_separation\_km}, \texttt{keep\_out\_distance\_km}, \texttt{ai\_risk\_probability}, and \texttt{ai\_risk\_label}. They also include \texttt{ai\_primary\_driver} and \texttt{ai\_model\_version}, making the priority explanation and fixed model revision auditable. The synthetic dashboard lab reports the score before its unsafe intercept and after its maneuvered pass alongside their separations.
 
 \section{Telemetry dictionary}
 \begin{center}
@@ -286,6 +291,8 @@ Field & Unit & Meaning \\
 \texttt{avoidance\_status} & -- & \texttt{CLEAR}, \texttt{MANEUVER\_PLANNED}, or \texttt{OUT\_OF\_FUEL} \\
 \texttt{ai\_risk\_probability} & 0--1 & Advisory synthetic-calibrated encounter-priority score \\
 \texttt{ai\_risk\_label} & -- & \texttt{LOW}, \texttt{ELEVATED}, \texttt{HIGH}, or \texttt{CRITICAL} \\
+\texttt{ai\_primary\_driver} & -- & Largest positive fixed-model contribution to the priority score \\
+\texttt{ai\_model\_version} & -- & Immutable scoring-model revision identifier \\
 \bottomrule
 \end{tabular}
 \end{center}

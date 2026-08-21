@@ -10,6 +10,8 @@ def test_high_risk_synthetic_encounter_scores_above_low_risk_encounter():
     assert high.probability > low.probability
     assert high.label in {"HIGH", "CRITICAL"}
     assert low.label == "LOW"
+    assert high.primary_driver == "predicted separation"
+    assert high.model_version == "synthetic-logistic-v1"
 
 
 def test_risk_score_is_reproducible():

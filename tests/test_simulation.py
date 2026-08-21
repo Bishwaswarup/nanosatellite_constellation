@@ -13,10 +13,26 @@ from src.simulation import build_timestamps, simulate_tle_constellation
 
 ROOT = Path(__file__).parents[1]
 TLE_FILE = ROOT / "data" / "sample_constellation.tle"
+OFFICIAL_TLE_FILE = ROOT / "data" / "official_fleet_10.tle"
 
 
 def test_loads_five_satellites():
     assert len(load_tles(TLE_FILE)) == 5
+
+
+def test_loads_ten_distinct_official_satellites():
+    satellites = load_tles(OFFICIAL_TLE_FILE)
+    assert len(satellites) == 10
+    assert len({satellite.name for satellite in satellites}) == 10
+    assert {"ISS (ZARYA)", "HST", "LANDSAT 9", "NOAA 20 (JPSS-1)"} <= {satellite.name for satellite in satellites}
+
+
+def test_official_fleet_simulates_all_ten_satellites():
+    telemetry = simulate_tle_constellation(
+        OFFICIAL_TLE_FILE, datetime(2026, 8, 10, tzinfo=timezone.utc), duration_hours=1, step_seconds=1800,
+    )
+    assert len(telemetry) == 30
+    assert telemetry["satellite"].nunique() == 10
 
 
 def test_build_timestamps_is_inclusive():
@@ -95,3 +111,4 @@ def test_avoidance_plans_are_numerically_rescreened():
     assert set(maneuvers["avoidance_effectiveness"]) <= {"CLEARED", "INSUFFICIENT"}
     assert maneuvers["ai_risk_probability"].between(0, 1).all()
     assert set(maneuvers["ai_risk_label"]) <= {"LOW", "ELEVATED", "HIGH", "CRITICAL"}
+    assert maneuvers["ai_primary_driver"].notna().all()

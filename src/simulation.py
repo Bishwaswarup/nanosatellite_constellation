@@ -92,6 +92,8 @@ def simulate_tle_constellation(
                     "keep_out_distance_km": float(alert["keep_out_distance_km"]) if alert and pd.notna(alert.get("keep_out_distance_km")) else collision_avoidance.keep_out_distance_km if collision_avoidance else None,
                     "ai_risk_probability": float(alert["ai_risk_probability"]) if alert and pd.notna(alert.get("ai_risk_probability")) else None,
                     "ai_risk_label": alert.get("ai_risk_label", "UNAVAILABLE") if alert else "CLEAR",
+                    "ai_primary_driver": alert.get("ai_primary_driver", "NONE") if alert else "NONE",
+                    "ai_model_version": alert.get("ai_model_version", "synthetic-logistic-v1") if alert else "synthetic-logistic-v1",
                     "avoidance_event": False,
                     "avoidance_delta_v_m_s": 0.0,
                     "avoidance_status": "CLEAR",
@@ -120,6 +122,8 @@ def simulate_tle_constellation(
                             "keep_out_distance_km": float(plan["keep_out_distance_km"]) if pd.notna(plan.get("keep_out_distance_km")) else collision_avoidance.keep_out_distance_km,
                             "ai_risk_probability": float(plan["ai_risk_probability"]) if pd.notna(plan.get("ai_risk_probability")) else None,
                             "ai_risk_label": plan.get("ai_risk_label", "UNAVAILABLE"),
+                            "ai_primary_driver": plan.get("ai_primary_driver", "NONE"),
+                            "ai_model_version": plan.get("ai_model_version", "synthetic-logistic-v1"),
                             "predicted_post_burn_separation_km": float(plan["predicted_post_burn_separation_km"]),
                             "avoidance_effectiveness": plan["avoidance_effectiveness"],
                         }

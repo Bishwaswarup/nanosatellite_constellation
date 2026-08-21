@@ -85,6 +85,8 @@ def screen_conjunctions(telemetry: pd.DataFrame, config: CollisionAvoidanceConfi
                     "keep_out_distance_km": config.keep_out_distance_km,
                     "ai_risk_probability": assessment.probability,
                     "ai_risk_label": assessment.label,
+                    "ai_primary_driver": assessment.primary_driver,
+                    "ai_model_version": assessment.model_version,
                 })
             if pair not in active or separation_km < float(active[pair]["closest_approach_km"]):
                 active[pair] = candidate
@@ -92,7 +94,7 @@ def screen_conjunctions(telemetry: pd.DataFrame, config: CollisionAvoidanceConfi
         for pair in completed_pairs:
             events.append(active.pop(pair))
     events.extend(active.values())
-    columns = ["timestamp", "satellite_a", "satellite_b", "closest_approach_km", "relative_position_km", "relative_velocity_km_s", "time_to_closest_approach_s", "predicted_closest_separation_km", "keep_out_distance_km", "ai_risk_probability", "ai_risk_label"]
+    columns = ["timestamp", "satellite_a", "satellite_b", "closest_approach_km", "relative_position_km", "relative_velocity_km_s", "time_to_closest_approach_s", "predicted_closest_separation_km", "keep_out_distance_km", "ai_risk_probability", "ai_risk_label", "ai_primary_driver", "ai_model_version"]
     return pd.DataFrame(events, columns=columns)
 
 

@@ -4,19 +4,17 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="53a44010-1d70-4a43-bd3a-5ab2be95d4e5" name="Changes" comment="Phase 4">
-      <change afterPath="$PROJECT_DIR$/src/numerical.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/risk_model.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/test_scenario.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_numerical.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_risk_model.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_test_scenario.py" afterDir="false" />
+    <list default="true" id="53a44010-1d70-4a43-bd3a-5ab2be95d4e5" name="Changes" comment="Phase 5">
+      <change afterPath="$PROJECT_DIR$/data/official_fleet_10.tle" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/docs/physics_guide.tex" beforeDir="false" afterPath="$PROJECT_DIR$/docs/physics_guide.tex" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/avoidance.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/avoidance.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/risk_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/risk_model.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/simulation.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/simulation.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/test_scenario.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/test_scenario.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_risk_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_risk_model.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/tests/test_simulation.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_simulation.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -45,6 +43,7 @@
     &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
     &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
     &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/bishwa/PycharmProjects/nanosatellite-manager&quot;,
     &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;
   }
 }</component>
@@ -62,6 +61,9 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1786288192942</updated>
+      <workItem from="1786466244890" duration="607000" />
+      <workItem from="1787201834919" duration="2058000" />
+      <workItem from="1787209210949" duration="278000" />
     </task>
     <task id="LOCAL-00001" summary="Phase 2">
       <option name="closed" value="true" />
@@ -95,7 +97,15 @@
       <option name="project" value="LOCAL" />
       <updated>1786293706904</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="Phase 5">
+      <option name="closed" value="true" />
+      <created>1786333373736</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1786333373736</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -109,6 +119,10 @@
     <MESSAGE value="Phase 2 (PHYSICS)" />
     <MESSAGE value="Phase 3" />
     <MESSAGE value="Phase 4" />
-    <option name="LAST_COMMIT_MESSAGE" value="Phase 4" />
+    <MESSAGE value="Phase 5" />
+    <option name="LAST_COMMIT_MESSAGE" value="Phase 5" />
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/nanosatellite_manager$main.coverage" NAME="main Coverage Results" MODIFIED="1787209229881" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>

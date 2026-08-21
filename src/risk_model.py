@@ -27,10 +27,12 @@ class CollisionRiskFeatures:
 
 @dataclass(frozen=True)
 class CollisionRiskAssessment:
-    """A calibrated-for-simulation score and a readable priority label."""
+    """A calibrated-for-simulation score, label, and primary explanation."""
 
     probability: float
     label: str
+    primary_driver: str
+    model_version: str = "synthetic-logistic-v1"
 
 
 class CollisionRiskModel:
@@ -51,16 +53,17 @@ class CollisionRiskModel:
 
         # Fixed, synthetic-data calibration: proximity is dominant, while
         # closing speed and short time-to-approach increase prioritization.
-        logit = (
-            -1.55
-            + 4.25 * (1.0 - min(predicted_ratio, 2.0))
-            + 0.45 * (1.0 - min(current_ratio, 2.0))
-            + 0.30 * log1p(velocity_norm / 0.01)
-            + 0.55 * urgency
-        )
+        contributions = {
+            "predicted separation": 4.25 * (1.0 - min(predicted_ratio, 2.0)),
+            "current separation": 0.45 * (1.0 - min(current_ratio, 2.0)),
+            "relative velocity": 0.30 * log1p(velocity_norm / 0.01),
+            "time to closest approach": 0.55 * urgency,
+        }
+        logit = -1.55 + sum(contributions.values())
         probability = 1.0 / (1.0 + exp(-np.clip(logit, -30.0, 30.0)))
         label = "CRITICAL" if probability >= 0.80 else "HIGH" if probability >= 0.55 else "ELEVATED" if probability >= 0.30 else "LOW"
-        return CollisionRiskAssessment(probability=float(probability), label=label)
+        primary_driver = max(contributions, key=contributions.__getitem__)
+        return CollisionRiskAssessment(probability=float(probability), label=label, primary_driver=primary_driver)
 
     @staticmethod
     def _validate(features: CollisionRiskFeatures) -> None:

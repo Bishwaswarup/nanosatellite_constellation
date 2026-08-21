@@ -31,7 +31,7 @@ def synthetic_safe_pass_figure() -> tuple[go.Figure, float, float]:
     figure.update_layout(
         height=600, title="Synthetic test satellite: unsafe intercept vs. maneuvered safe pass",
         scene={"xaxis_title": "Along-track (km)", "yaxis_title": "Cross-track (km)", "zaxis_title": "Radial (km)", "aspectmode": "data"},
-        updatemenus=[{"type": "buttons", "buttons": [{"label": "▶ Play", "method": "animate", "args": [None, {"frame": {"duration": 80, "redraw": True}, "fromcurrent": True}]}, {"label": "❚❚ Pause", "method": "animate", "args": [[None], {"mode": "immediate"}]}]}],
+        updatemenus=[{"type": "buttons", "buttons": [{"label": "Play", "method": "animate", "args": [None, {"frame": {"duration": 80, "redraw": True}, "fromcurrent": True}]}, {"label": "Pause", "method": "animate", "args": [[None], {"mode": "immediate"}]}]}],
         margin={"l": 0, "r": 0, "t": 50, "b": 0},
     )
     return figure, before_distance, after_distance
