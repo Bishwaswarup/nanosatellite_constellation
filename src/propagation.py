@@ -33,6 +33,33 @@ def load_tles(path: str | Path) -> list[SatelliteDefinition]:
     return satellites
 
 
+def teme_state(satrec: Satrec, when: datetime) -> tuple[np.ndarray, np.ndarray]:
+    """SGP4 TEME position (km) and velocity (km/s) at a timezone-aware UTC time."""
+    when_utc = when.astimezone(timezone.utc)
+    jd, fraction = jday(
+        when_utc.year, when_utc.month, when_utc.day, when_utc.hour, when_utc.minute,
+        when_utc.second + when_utc.microsecond / 1_000_000,
+    )
+    error, position_km, velocity_km_s = satrec.sgp4(jd, fraction)
+    if error:
+        raise RuntimeError(f"SGP4 error: {SGP4_ERRORS[error]}")
+    return np.asarray(position_km), np.asarray(velocity_km_s)
+
+
+def make_state_function(satellites: Iterable[SatelliteDefinition]):
+    """Return ``state_fn(name, when) -> (r, v)`` evaluating SGP4 exactly for each named satellite."""
+    recs = {sat.name: Satrec.twoline2rv(sat.line1, sat.line2) for sat in satellites}
+    return lambda name, when: teme_state(recs[name], when)
+
+
+def tle_epoch(satellite: SatelliteDefinition) -> datetime:
+    """UTC epoch of a TLE."""
+    from datetime import timedelta
+    rec = Satrec.twoline2rv(satellite.line1, satellite.line2)
+    days = (rec.jdsatepoch - 2451544.5) + rec.jdsatepochF          # since 2000-01-01 00:00 UTC
+    return datetime(2000, 1, 1, tzinfo=timezone.utc) + timedelta(days=days)
+
+
 def propagate_satellite(satellite: SatelliteDefinition, when: datetime) -> dict[str, float | str | datetime]:
     """Return TEME and ECEF state-derived telemetry for one satellite at UTC time."""
     if when.tzinfo is None:

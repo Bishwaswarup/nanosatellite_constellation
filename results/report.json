@@ -1,0 +1,201 @@
+{
+ "start_utc": "2026-08-08T15:53:38+00:00",
+ "duration_h": 24,
+ "satellites": [
+  "ISS (ZARYA)",
+  "HST",
+  "TERRA",
+  "AQUA",
+  "SUOMI NPP",
+  "LANDSAT 8",
+  "SENTINEL-1A",
+  "SENTINEL-2A",
+  "NOAA 20 (JPSS-1)",
+  "LANDSAT 9"
+ ],
+ "closest_approaches": [
+  {
+   "satellite_a": "AQUA",
+   "satellite_b": "LANDSAT 9",
+   "closest_approach_km": 28.67951339365432,
+   "tca_time": "2026-08-09T12:54:17.418160+00:00",
+   "relative_velocity_km_s": 11.287889720061974
+  },
+  {
+   "satellite_a": "LANDSAT 9",
+   "satellite_b": "SUOMI NPP",
+   "closest_approach_km": 127.61410944072477,
+   "tca_time": "2026-08-09T15:24:40.432784+00:00",
+   "relative_velocity_km_s": 13.342073112169489
+  },
+  {
+   "satellite_a": "AQUA",
+   "satellite_b": "SENTINEL-2A",
+   "closest_approach_km": 156.4989307704221,
+   "tca_time": "2026-08-08T16:21:57.598271+00:00",
+   "relative_velocity_km_s": 11.651963241084273
+  },
+  {
+   "satellite_a": "LANDSAT 9",
+   "satellite_b": "NOAA 20 (JPSS-1)",
+   "closest_approach_km": 176.77574181010414,
+   "tca_time": "2026-08-09T03:53:00.868371+00:00",
+   "relative_velocity_km_s": 13.42723517164506
+  },
+  {
+   "satellite_a": "SENTINEL-2A",
+   "satellite_b": "TERRA",
+   "closest_approach_km": 182.3030025148142,
+   "tca_time": "2026-08-08T22:11:11.540366+00:00",
+   "relative_velocity_km_s": 3.4117246171060387
+  },
+  {
+   "satellite_a": "NOAA 20 (JPSS-1)",
+   "satellite_b": "TERRA",
+   "closest_approach_km": 226.95804909039188,
+   "tca_time": "2026-08-09T07:17:50.557127+00:00",
+   "relative_velocity_km_s": 12.005127619261062
+  },
+  {
+   "satellite_a": "HST",
+   "satellite_b": "SENTINEL-1A",
+   "closest_approach_km": 233.108050803992,
+   "tca_time": "2026-08-09T00:47:27.283278+00:00",
+   "relative_velocity_km_s": 13.234131650273138
+  },
+  {
+   "satellite_a": "HST",
+   "satellite_b": "LANDSAT 8",
+   "closest_approach_km": 237.74083749136494,
+   "tca_time": "2026-08-09T06:35:48.758932+00:00",
+   "relative_velocity_km_s": 13.204397591119474
+  },
+  {
+   "satellite_a": "AQUA",
+   "satellite_b": "SUOMI NPP",
+   "closest_approach_km": 261.78328936225256,
+   "tca_time": "2026-08-09T13:47:09.527530+00:00",
+   "relative_velocity_km_s": 3.815826412129224
+  },
+  {
+   "satellite_a": "ISS (ZARYA)",
+   "satellite_b": "LANDSAT 9",
+   "closest_approach_km": 294.82021043726775,
+   "tca_time": "2026-08-09T03:58:01.887106+00:00",
+   "relative_velocity_km_s": 12.318770026840186
+  }
+ ],
+ "best_pair": {
+  "pair": [
+   "AQUA",
+   "LANDSAT 9"
+  ],
+  "exact_km": 28.67951339365432,
+  "tca_utc": "2026-08-09T12:54:17.418160+00:00",
+  "relative_speed_km_s": 11.287889720061974,
+  "sampled_300s_min_over_run_km": 70.01932632533041,
+  "sampled_60s_min_over_run_km": 70.01932632533041
+ },
+ "hermite_max_error_km": 0.3657726106594055,
+ "sampled_300s_misses_below_50km": 1,
+ "post_burn_check": [
+  {
+   "delta_v_m_s": 0.0,
+   "displacement_km": 0.0,
+   "differential_separation_km": 28.67951339365432,
+   "direct_two_body_vs_sgp4_km": 246.22763674309974
+  },
+  {
+   "delta_v_m_s": 0.01,
+   "displacement_km": 0.6780320722044568,
+   "differential_separation_km": 28.28254039256864,
+   "direct_two_body_vs_sgp4_km": 246.9010726214359
+  },
+  {
+   "delta_v_m_s": 0.1,
+   "displacement_km": 6.780374086455867,
+   "differential_separation_km": 25.25238880360856,
+   "direct_two_body_vs_sgp4_km": 252.96286721187516
+  },
+  {
+   "delta_v_m_s": 0.5,
+   "displacement_km": 33.90302480184345,
+   "differential_separation_km": 28.566616459284194,
+   "direct_two_body_vs_sgp4_km": 279.92092389538186
+  }
+ ],
+ "two_body_vs_sgp4_6h_km": {
+  "ISS (ZARYA)": 209.74875254370517,
+  "HST": 263.3237232254958,
+  "TERRA": 54.87323121509871,
+  "AQUA": 27.990345211692947,
+  "SUOMI NPP": 429.84304205127785,
+  "LANDSAT 8": 93.99325471298924,
+  "SENTINEL-1A": 279.4271602474027,
+  "SENTINEL-2A": 117.51995259297216,
+  "NOAA 20 (JPSS-1)": 147.6099878521365,
+  "LANDSAT 9": 97.68852067553037
+ },
+ "station_keeping_1km_per_day": [
+  {
+   "satellite": "AQUA",
+   "burns": 4,
+   "delta_v_m_s": 0.42828784332108594,
+   "fuel_percent": 99.88090307863091
+  },
+  {
+   "satellite": "HST",
+   "burns": 4,
+   "delta_v_m_s": 0.4485390326412972,
+   "fuel_percent": 99.8752722776751
+  },
+  {
+   "satellite": "ISS (ZARYA)",
+   "burns": 4,
+   "delta_v_m_s": 0.4538377901463666,
+   "fuel_percent": 99.8737989779257
+  },
+  {
+   "satellite": "LANDSAT 8",
+   "burns": 4,
+   "delta_v_m_s": 0.42680808516582075,
+   "fuel_percent": 99.88131452437203
+  },
+  {
+   "satellite": "LANDSAT 9",
+   "burns": 4,
+   "delta_v_m_s": 0.4268085514904632,
+   "fuel_percent": 99.88131439471113
+  },
+  {
+   "satellite": "NOAA 20 (JPSS-1)",
+   "burns": 4,
+   "delta_v_m_s": 0.41579794762936195,
+   "fuel_percent": 99.88437589443117
+  },
+  {
+   "satellite": "SENTINEL-1A",
+   "burns": 4,
+   "delta_v_m_s": 0.42747341715098086,
+   "fuel_percent": 99.8811295292347
+  },
+  {
+   "satellite": "SENTINEL-2A",
+   "burns": 4,
+   "delta_v_m_s": 0.4191082014446232,
+   "fuel_percent": 99.8834554763195
+  },
+  {
+   "satellite": "SUOMI NPP",
+   "burns": 4,
+   "delta_v_m_s": 0.41579987063295043,
+   "fuel_percent": 99.88437535973871
+  },
+  {
+   "satellite": "TERRA",
+   "burns": 4,
+   "delta_v_m_s": 0.427989101982144,
+   "fuel_percent": 99.88098614343315
+  }
+ ]
+}

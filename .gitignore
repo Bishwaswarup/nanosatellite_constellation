@@ -1,0 +1,14 @@
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.idea/
+.agents/
+.DS_Store
+build/
+*.aux
+*.log
+*.toc
+*.out
+*.fls
+*.fdb_latexmk

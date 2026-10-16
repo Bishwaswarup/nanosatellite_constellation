@@ -30,7 +30,7 @@ This document explains the physics represented by the project and how its code m
 \begin{enumerate}
   \item \textbf{Authoritative trajectory layer.} A Two-Line Element set (TLE) is propagated using SGP4. Its output is an inertial position and velocity in the True Equator Mean Equinox (TEME) frame, transformed to the Earth-fixed ITRS/ECEF frame for ground tracks.
   \item \textbf{Control and resource layer.} A transparent, simplified mean-altitude model applies virtual orbital decay, commands an altitude-restoration burn, and tracks propellant through the rocket equation.
-  \item \textbf{Conjunction and command layer.} Pairwise Earth-fixed separation is screened at common timestamps. A deterministic, fuel-accounted virtual avoidance command is recorded whenever a selected keep-out zone is crossed.
+  \item \textbf{Conjunction and command layer.} Every satellite pair is screened between samples with a cubic Hermite fit of the relative motion, and candidates are refined to the exact SGP4 time of closest approach. A deterministic, fuel-accounted virtual avoidance command is recorded whenever a selected keep-out zone is crossed.
   \item \textbf{Advisory AI-risk layer.} A small, reproducible logistic model prioritizes deterministic candidates using relative motion. It cannot create, suppress, approve, or reject a safety action.
 \end{enumerate}
 
@@ -188,11 +188,11 @@ The following plots are a deterministic illustration using a decay rate of \SI{1
 \end{figure}
 
 \section{Phase 3: conjunction screening and virtual avoidance}
-At each prediction timestamp, the software compares every unordered satellite pair. Given ECEF position vectors $\mathbf r_i$ and $\mathbf r_j$, their separation is
+For every unordered pair the software forms the relative position $\Delta\mathbf r=\mathbf r_i-\mathbf r_j$ and velocity $\Delta\mathbf v$ at each sample (TEME; the separation is the same in any frame). Sampling the separation alone misses most encounters: two LEO satellites close at 10--15\,km/s, i.e.\ thousands of kilometres per 300\,s step. Inside each interval $[t_k,t_k+h]$ the relative position is therefore represented by the cubic Hermite polynomial through the end values and end velocities,
 \begin{equation}
-  d_{ij}=\left\|\mathbf r_i-\mathbf r_j\right\|.
+  \Delta\mathbf r(s)=h_{00}(s)\Delta\mathbf r_k+h\,h_{10}(s)\Delta\mathbf v_k+h_{01}(s)\Delta\mathbf r_{k+1}+h\,h_{11}(s)\Delta\mathbf v_{k+1},\qquad s\in[0,1],
 \end{equation}
-If $d_{ij}<d_{\mathrm{keepout}}$, the pair is an alert candidate. Consecutive below-threshold samples are collapsed to the sample with the smallest separation, preventing a prolonged close passage from generating duplicate alerts.
+and its minimum norm $d_k$ is found on a grid in $s$ and polished by golden-section search. Every interval with $d_k<d_{\mathrm{keepout}}+25\,km$ is refined by golden-section search on the exact SGP4 separation, which gives the time of closest approach (TCA) and the miss distance $d_{\mathrm{closest}}$. Adjacent intervals belonging to the same passage are merged into one event. On the archived ten-satellite fleet the Hermite estimate is within 0.4\,km of the exact miss distance at a 300\,s step, and the refined values agree with a 0.5\,s brute-force search to a few metres.
 
 The deterministic policy assigns one member of a flagged pair a retrograde phase-separation command. Its scale is a bounded approximation based on additional clearance accumulated over planning time $T$:
 \begin{equation}
@@ -287,7 +287,7 @@ Field & Unit & Meaning \\
 \texttt{fuel\_remaining\_kg} & kg & Remaining virtual propellant \\
 \texttt{station\_keeping\_status} & -- & \texttt{NOMINAL}, \texttt{MANEUVER}, or \texttt{OUT\_OF\_FUEL} \\
 \texttt{conjunction\_alert} & -- & Whether this satellite belongs to a flagged close-approach pair \\
-\texttt{closest\_approach\_km} & km & Minimum sampled separation for its conjunction event \\
+\texttt{closest\_approach\_km} & km & Miss distance at the refined time of closest approach \\
 \texttt{avoidance\_status} & -- & \texttt{CLEAR}, \texttt{MANEUVER\_PLANNED}, or \texttt{OUT\_OF\_FUEL} \\
 \texttt{ai\_risk\_probability} & 0--1 & Advisory synthetic-calibrated encounter-priority score \\
 \texttt{ai\_risk\_label} & -- & \texttt{LOW}, \texttt{ELEVATED}, \texttt{HIGH}, or \texttt{CRITICAL} \\
@@ -297,10 +297,15 @@ Field & Unit & Meaning \\
 \end{tabular}
 \end{center}
 
-\section{Model limits and the Phase 5 path}
-The present model is appropriate for demonstrating systems engineering connections: TLE ingestion, frame conversion, feedback control, delta-v budgeting, and a dashboard. It is not a mission-design-grade orbit determination system. Specifically, it does not yet include drag density models, covariance propagation, thrust direction errors, eclipse constraints, or post-burn numerical propagation.
+\section{Post-burn re-screen}
+A planned burn is checked by propagating the manoeuvring satellite's TEME state from the burn time to the TCA twice with a fourth-order Runge--Kutta two-body integrator, once with and once without the velocity change. Only the \emph{difference} of the two arcs, $\delta\mathbf r$, is used:
+\begin{equation}
+  d_{\mathrm{post}}=\left\|\mathbf r^{\mathrm{SGP4}}_{\mathrm{man}}(t_{\mathrm{TCA}})+\delta\mathbf r-\mathbf r^{\mathrm{SGP4}}_{\mathrm{prot}}(t_{\mathrm{TCA}})\right\|.
+\end{equation}
+Comparing a two-body arc directly with the other satellite's SGP4 position would mix in the difference between the two force models, which on this fleet is 28--430\,km after six hours, far larger than the effect of a sub-m/s burn (about 0.7\,km per 0.01\,m/s over six hours). With the differential form a zero burn reproduces the SGP4 miss distance exactly.
 
-Phase 5 adds the first maneuver-aware validation component: a TEME Cartesian state receives an instantaneous prograde or retrograde velocity update, then advances under central Earth gravity using fourth-order Runge--Kutta integration. The numerical model is deliberately a two-body baseline; it is suitable for checking the directional effect of a planned burn, but a production system must add J2, drag, third bodies, Earth orientation, and covariance handling before interpreting a re-screen as operationally valid.
+\section{Model limits}
+The present model is appropriate for demonstrating systems engineering connections: TLE ingestion, frame conversion, feedback control, delta-v budgeting, conjunction screening and a dashboard. It is not a mission-design-grade orbit determination system. It does not include drag density models, covariance propagation, collision probability, thrust direction errors or eclipse constraints, and the burn effect uses two-body dynamics.
 
 The AI layer adds further limits: it has no tracking covariance, object size, attitude, maneuver uncertainty, high-fidelity force model, sensor data, or operational calibration data. Linearized TCA is only a feature, not an orbit propagator. Therefore this software is a simulation and decision-support demonstrator, \emph{not} an operational collision-avoidance system; humans and validated deterministic flight-dynamics processes must retain authority.
 

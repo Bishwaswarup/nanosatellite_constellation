@@ -1,4 +1,4 @@
-"""Phase 4 Streamlit command center for the nanosatellite constellation manager."""
+"""Streamlit command center for the nanosatellite constellation manager."""
 
 from datetime import datetime, timezone
 from pathlib import Path
@@ -7,8 +7,9 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
-from src.avoidance import CollisionAvoidanceConfig
+from src.avoidance import CollisionAvoidanceConfig, closest_approaches
 from src.models import StationKeepingConfig
+from src.propagation import load_tles, make_state_function, tle_epoch
 from src.simulation import simulate_tle_constellation
 from src.test_scenario import synthetic_safe_pass_figure, synthetic_scenario_risks
 
@@ -120,6 +121,14 @@ with st.sidebar:
     st.header("Simulation controls")
     fleet_name = st.selectbox("Fleet scenario", options=list(FLEET_OPTIONS), help="The official fleet uses archived CelesTrak TLEs. It is not a live operational feed.")
     tle_file = FLEET_OPTIONS[fleet_name]
+    fleet_epoch = max(tle_epoch(sat) for sat in load_tles(tle_file)).replace(microsecond=0)
+    start_mode = st.radio(
+        "Start time", ["TLE epoch (recommended)", "Now"], horizontal=True,
+        help="The TLEs are an archived snapshot. SGP4 accuracy degrades by kilometres per day away from the epoch, "
+             "so starting at the epoch keeps the run meaningful.",
+    )
+    start_time = fleet_epoch if start_mode.startswith("TLE") else datetime.now(timezone.utc).replace(microsecond=0)
+    st.caption(f"Start: {start_time:%Y-%m-%d %H:%M} UTC")
     duration_hours = st.slider("Duration (hours)", 1, 24, 24)
     step_seconds = st.select_slider("Timestep (seconds)", options=[60, 120, 300, 600], value=300)
     st.divider()
@@ -131,10 +140,11 @@ with st.sidebar:
     keep_out_distance = st.slider("Keep-out distance (km)", 1.0, 2_000.0, 2.0, 1.0)
     run = st.button("Run simulation", type="primary", width="stretch")
 
-if run or st.session_state.get("fleet_scenario") != fleet_name or "telemetry" not in st.session_state:
+scenario_key = (fleet_name, start_mode)
+if run or st.session_state.get("fleet_scenario") != scenario_key or "telemetry" not in st.session_state:
     with st.spinner("Propagating constellation and screening conjunctions…"):
         st.session_state.telemetry = simulate_tle_constellation(
-            tle_file, start=datetime.now(timezone.utc), duration_hours=duration_hours,
+            tle_file, start=start_time, duration_hours=duration_hours,
             step_seconds=step_seconds,
             station_keeping=StationKeepingConfig(
                 decay_rate_km_per_day=decay_rate, altitude_tolerance_km=altitude_tolerance,
@@ -142,7 +152,8 @@ if run or st.session_state.get("fleet_scenario") != fleet_name or "telemetry" no
             ),
             collision_avoidance=CollisionAvoidanceConfig(keep_out_distance_km=keep_out_distance),
         )
-        st.session_state.fleet_scenario = fleet_name
+        st.session_state.closest = closest_approaches(st.session_state.telemetry, make_state_function(load_tles(tle_file)))
+        st.session_state.fleet_scenario = scenario_key
 
 telemetry = st.session_state.telemetry
 timestamps = list(telemetry["timestamp"].drop_duplicates().sort_values())
@@ -167,7 +178,13 @@ metric_columns[1].metric("Mean altitude", f"{snapshot['altitude_km'].mean():.1f}
 metric_columns[2].metric("Minimum fuel", f"{snapshot['fuel_percent'].min():.2f}%")
 metric_columns[3].metric("Station-keeping burns", int(telemetry["station_keeping_event"].sum()))
 metric_columns[4].metric("Avoidance commands", int(telemetry["avoidance_event"].sum()))
-st.caption(f"Scenario: {fleet_name}. {snapshot['satellite'].nunique() * (snapshot['satellite'].nunique() - 1) // 2:,} pairwise comparisons per prediction timestamp.")
+closest = st.session_state.closest
+st.caption(
+    f"Scenario: {fleet_name}. {snapshot['satellite'].nunique() * (snapshot['satellite'].nunique() - 1) // 2:,} pairs, "
+    f"screened between samples (cubic Hermite) and refined on SGP4. Closest pass in this run: "
+    f"{closest.iloc[0]['satellite_a']} – {closest.iloc[0]['satellite_b']}, {closest.iloc[0]['closest_approach_km']:.1f} km "
+    f"at {closest.iloc[0]['tca_time']:%Y-%m-%d %H:%M:%S} UTC."
+)
 
 overview, ground_tracks, orbital_web, telemetry_tab, test_lab = st.tabs(["Overview", "Ground tracks", "3D orbital web", "Telemetry & alerts", "Synthetic test lab"])
 
@@ -211,9 +228,18 @@ with telemetry_tab:
             "ai_primary_driver", "ai_model_version",
         ]], hide_index=True, width="stretch",
     )
+    st.subheader("Closest approach of every pair in this run")
+    st.dataframe(
+        closest, hide_index=True, width="stretch",
+        column_config={
+            "closest_approach_km": st.column_config.NumberColumn("Miss distance (km)", format="%.2f"),
+            "relative_velocity_km_s": st.column_config.NumberColumn("Relative speed (km/s)", format="%.2f"),
+            "tca_time": st.column_config.DatetimeColumn("TCA (UTC)", format="YYYY-MM-DD HH:mm:ss"),
+        },
+    )
     st.subheader("Conjunction and avoidance event log")
     event_log = telemetry[telemetry["conjunction_alert"]][
-        ["timestamp", "satellite", "closest_approach_km", "predicted_closest_separation_km", "ai_risk_probability", "ai_risk_label", "ai_primary_driver", "avoidance_status", "avoidance_delta_v_m_s", "predicted_post_burn_separation_km", "avoidance_effectiveness"]
+        ["timestamp", "tca_time", "satellite", "closest_approach_km", "predicted_closest_separation_km", "ai_risk_probability", "ai_risk_label", "ai_primary_driver", "avoidance_status", "avoidance_delta_v_m_s", "predicted_post_burn_separation_km", "avoidance_effectiveness"]
     ]
     if event_log.empty:
         st.success("No close approaches crossed the selected keep-out distance.")
